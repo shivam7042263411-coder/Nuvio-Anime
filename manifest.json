@@ -1,0 +1,21 @@
+{
+  "name": "AnimePahe",
+  "version": "1.0.0",
+  "description": "AnimePahe source plugin for NuvioTV. Streams anime from animepahe.com via the Cloudflare bypass proxy. Supports Sub/Dub qualities (360p-1080p).",
+  "author": "Nuvio Community",
+  "scrapers": [
+    {
+      "id": "animepahe",
+      "name": "AnimePahe",
+      "description": "Anime streams from animepahe.com via proxy",
+      "version": "1.0.0",
+      "filename": "animepahe.js",
+      "supportedTypes": ["movie", "tv"],
+      "enabled": true,
+      "contentLanguage": ["en", "ja"],
+      "supportedPlatforms": ["androidtv", "android", "firetv"],
+      "formats": ["m3u8"],
+      "supportedFormats": ["m3u8"]
+    }
+  ]
+}
