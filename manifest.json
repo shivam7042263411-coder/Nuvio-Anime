@@ -1,14 +1,14 @@
 {
   "name": "AnimePahe",
-  "version": "1.0.0",
-  "description": "AnimePahe source plugin for NuvioTV. Streams anime from animepahe.com via the Cloudflare bypass proxy. Supports Sub/Dub qualities (360p-1080p).",
+  "version": "1.1.0",
+  "description": "AnimePahe source for NuvioTV. Resolves TMDB season/episode to AnimePahe entries, then kwik.cx -> HLS. Direct requests first, Cloudflare proxy as fallback.",
   "author": "Nuvio Community",
   "scrapers": [
     {
       "id": "animepahe",
       "name": "AnimePahe",
-      "description": "Anime streams from animepahe.com via proxy",
-      "version": "1.0.0",
+      "description": "Anime streams from animepahe.pw (Sub/Dub, 360p-1080p)",
+      "version": "1.1.0",
       "filename": "animepahe.js",
       "supportedTypes": ["movie", "tv"],
       "enabled": true,
