@@ -174,8 +174,8 @@ describe("HTTP API", () => {
 
     expect(body.data.providers.sources).toEqual([{ id: "catalog", name: "Catalogue" }]);
     expect(body.data.providers.sourceProviders).toEqual([
-      { id: "catalog", name: "Catalogue", configured: true },
-      { id: "animepahe", name: "AnimePahe", configured: false }
+      { id: "catalog", name: "Catalogue", configured: true, subtitles: false },
+      { id: "animepahe", name: "AnimePahe", configured: false, subtitles: false }
     ]);
   });
 });

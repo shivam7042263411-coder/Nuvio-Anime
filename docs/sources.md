@@ -380,6 +380,11 @@ separation, empty pages, challenges, partial failures and deduplication.
 
 ## Adding a source provider
 
+Providers are independent. The API runs every configured provider in parallel
+under one timeout, keeps the others when one fails, normalizes and deduplicates
+the combined result, and returns one stable response shape. Adding a provider
+requires no change to the Nuvio adapter, the routes, or the database schema.
+
 The catalogue is one implementation of a small interface:
 
 ```ts
@@ -394,8 +399,8 @@ export interface SourceProvider {
 }
 ```
 
-`context` contains the resolved `AnimeMetadata` and `Episode`. A provider must
-return `Source` objects with:
+`context` contains the resolved `AnimeMetadata` and `Episode`, so a provider
+never performs its own AniList/TMDB lookup. A provider returns `Source` objects:
 
 ```ts
 {
@@ -416,18 +421,91 @@ return `Source` objects with:
 }
 ```
 
-Register a provider in `src/container.ts`:
+### Minimal provider skeleton
+
+```ts
+// src/sources/example/provider.ts
+import type { Config } from "../../config.js";
+import type { Logger } from "../../logger.js";
+import type { ProviderResult, SourceContext, SourceProvider } from "../types.js";
+
+export class ExampleProvider implements SourceProvider {
+  readonly id = "example";
+  readonly name = "Example";
+
+  constructor(private readonly options: { config: Config; logger: Logger }) {}
+
+  isConfigured(): boolean {
+    return this.options.config.sources.example.enabled;
+  }
+
+  async getSources(_context: SourceContext): Promise<ProviderResult> {
+    return {
+      sources: [
+        {
+          id: "example:episode-1",
+          provider: this.id,
+          providerName: this.name,
+          label: "Sub",
+          language: "ja",
+          quality: "1080p",
+          type: "hls",
+          delivery: "stream",
+          url: "https://licensed-cdn.example/episode-1.m3u8",
+          headers: {},
+          expiresAt: null,
+          temporary: true
+        }
+      ],
+      warnings: []
+    };
+  }
+}
+```
+
+Add a disabled-by-default flag in `src/config.ts`:
+
+```ts
+sources: {
+  example: { enabled: readBool(env, "SOURCE_EXAMPLE_ENABLED", false) }
+}
+```
+
+Register the provider once in `src/container.ts`:
 
 ```ts
 const sourceProviders: SourceProvider[] = [
   new CatalogSourceProvider(pool, config.sources.catalogEnabled, logger),
   new AnimePaheProvider({ http, metadata, config, logger })
+  // new ExampleProvider({ config, logger })
 ];
 ```
 
-Provider failures are isolated: if one provider fails, the others still return
-sources. If all configured providers fail, the endpoint returns
-`502 provider_error`.
+### What the service guarantees
+
+- **Parallel execution.** All configured providers are queried at once.
+- **Isolation.** A throwing, hanging or timed-out provider becomes a warning;
+  other providers still return sources. If every configured provider fails, the
+  endpoint returns `502 provider_error`.
+- **Timeout.** `SOURCE_PROVIDER_TIMEOUT_MS` (default 45s) caps each provider.
+- **Normalization.** Labels and stream types are canonicalized, headers are
+  sanitized, expiry is converted to ISO-8601, and an unknown `temporary` value
+  defaults to `true` so signed URLs are never persisted.
+- **Validation.** Sources without an `http(s)` URL, without
+  `delivery: "stream"`, or with an unknown label/type are dropped. The response
+  warns that the provider returned unusable sources.
+- **Deduplication.** The same URL, label, quality and playback headers are
+  returned once even when two providers surface it.
+- **Status.** `/api/status` lists each registered provider with `configured`
+  and whether it can contribute subtitles.
+- **Adapter compatibility.** The Nuvio adapter reads only
+  `/api/episode/<id>/sources`; provider changes never require a plugin update.
+
+### Tests
+
+Use synthetic fixtures only. [`tests/multi-provider.test.ts`](../tests/multi-provider.test.ts)
+shows the expected shape: two independent mock providers, deduplication,
+disabled providers, malformed output, failure isolation and status reporting.
 
 The catalogue provider stores only what an operator deliberately added. The
 optional AnimePahe provider resolves public links at request time and must not

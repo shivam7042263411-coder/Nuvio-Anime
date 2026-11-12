@@ -268,11 +268,12 @@ npm run build
 node --check nuvio-plugin/nuvio-anime-api.js
 ```
 
-The suite currently has **93 tests across 11 files**, covering search, metadata
+The suite currently has **101 tests across 12 files**, covering search, metadata
 matching, anime details, episode catalogues, subtitle parsing, invalid input,
-upstream failures, cache expiry and stale fallback, source labels,
-cross-provider deduplication, provider timeouts, AnimePahe matching, Sub/Dub/DL
-normalization, and the Nuvio adapter inside a QuickJS-style VM.
+upstream failures, cache expiry and stale fallback, source labels, multiple
+independent providers, cross-provider deduplication, provider timeouts,
+AnimePahe matching, Sub/Dub/DL normalization, and the Nuvio adapter inside a
+QuickJS-style VM.
 
 ## Adding source providers
 
@@ -295,6 +296,11 @@ npm run source:add -- \
 
 ### A new provider
 
+Providers are independent: the API already runs every configured provider in
+parallel, isolates failures, applies one timeout, normalizes each result and
+deduplicates across providers. Adding one does not change the Nuvio adapter or
+the database schema.
+
 1. Implement the `SourceProvider` interface in `src/sources/types.ts`:
 
    ```ts
@@ -308,11 +314,24 @@ npm run source:add -- \
    ```
 
 2. Place the implementation under `src/sources/<provider>/`.
-3. Register it in the `sourceProviders` array in `src/container.ts`.
-4. Add a disabled-by-default environment flag and validate it in `src/config.ts`.
-5. Return only `delivery: "stream"` sources; never build download actions.
+3. Add a disabled-by-default flag and validation in `src/config.ts`:
+
+   ```ts
+   example: { enabled: readBool(env, "SOURCE_EXAMPLE_ENABLED", false) }
+   ```
+
+4. Register it once in the `sourceProviders` array in `src/container.ts`.
+5. Return only `delivery: "stream"` sources with `http(s)` URLs; never build
+   download actions. The service canonicalizes labels (`Sub`/`Dub`/`DL`), stream
+   types (`hls`/`dash`/`mp4`), headers and expiry, and drops malformed entries
+   with a warning instead of forwarding them.
 6. Add tests with synthetic fixtures. Do not call live sites in tests.
 7. Respect the provider timeout budget and report failures as warnings.
+8. Check `/api/status`: `providers.sourceProviders` lists every registered
+   provider with `configured` and subtitle capability.
+
+See [docs/sources.md](docs/sources.md) for a complete skeleton and the runtime
+guarantees.
 
 ## Current provider status and limitations
 

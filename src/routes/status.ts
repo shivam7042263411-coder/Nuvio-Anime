@@ -29,7 +29,8 @@ export async function statusRoute(c: Context<AppEnv>, container: Container) {
       sourceProviders: container.sourceProviders.map((provider) => ({
         id: provider.id,
         name: provider.name,
-        configured: provider.isConfigured()
+        configured: provider.isConfigured(),
+        subtitles: typeof provider.getSubtitles === "function"
       }))
     },
     environment: container.config.nodeEnv

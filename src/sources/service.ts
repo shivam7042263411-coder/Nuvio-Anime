@@ -4,7 +4,7 @@ import type { Config } from "../config.js";
 import type { EpisodesService } from "../episodes/service.js";
 import { ProviderError } from "../errors.js";
 import type { Logger } from "../logger.js";
-import { dedupeAndSortSources } from "./normalize.js";
+import { dedupeAndSortSources, normalizeProviderSources } from "./normalize.js";
 import type { Source, SourceProvider } from "./types.js";
 
 export interface SourcesResult {
@@ -69,7 +69,13 @@ export class SourcesService {
       const result = results[index]!;
       const provider = providers[index]!;
       if (result.status === "fulfilled") {
-        sources.push(...result.value.sources);
+        const normalized = normalizeProviderSources(result.value.sources, provider.id);
+        if (normalized.dropped > 0) {
+          warnings.push(
+            `Source provider ${provider.name} returned ${normalized.dropped} unusable source(s).`
+          );
+        }
+        sources.push(...normalized.sources);
         warnings.push(...result.value.warnings);
       } else {
         failures += 1;
