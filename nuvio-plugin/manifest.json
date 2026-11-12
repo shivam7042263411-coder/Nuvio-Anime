@@ -1,16 +1,16 @@
 {
   "name": "Anime API",
-  "version": "1.0.0",
-  "description": "Independent anime metadata and source API for NuvioTV. Resolves TMDB episodes through the Anime API and returns Sub/Dub/DL streams plus external subtitle tracks. The plugin never scrapes or bypasses Cloudflare; source discovery stays server-side and the optional AnimePahe provider is disabled by default.",
+  "version": "1.0.1",
+  "description": "Independent anime metadata and source API for NuvioTV. Resolves AniList or TMDB episodes through the Anime API and returns Sub/Dub/DL streams plus external subtitle tracks. The plugin never scrapes or bypasses Cloudflare; source discovery stays server-side and the optional AnimePahe provider is disabled by default.",
   "author": "Nuvio Community",
   "scrapers": [
     {
       "id": "anime-api",
       "name": "Anime API",
       "description": "Authorized anime streams from your own Anime API deployment (Sub/Dub/DL)",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "filename": "nuvio-anime-api.js",
-      "supportedTypes": ["movie", "tv"],
+      "supportedTypes": ["movie", "tv", "anime"],
       "enabled": true,
       "contentLanguage": ["en", "ja"],
       "supportedPlatforms": ["androidtv", "android", "firetv"],

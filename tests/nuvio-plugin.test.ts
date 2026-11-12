@@ -69,7 +69,7 @@ function loadPlugin(
 }
 
 function payloadFor(call: FetchCall, data: Record<string, unknown>) {
-  if (call.url.endsWith("/api/anime/tmdb:42")) {
+  if (call.url.includes("/api/anime/")) {
     return jsonResponse({ data: { titles: { preferred: "Test Anime" } } });
   }
   if (call.url.includes("/sources")) {
@@ -177,6 +177,63 @@ describe("Nuvio adapter (QuickJS-compatible plugin)", () => {
       "https://api.test/api/episode/tmdb%3A42%3As2%3Ae3/sources",
       "https://api.test/api/episode/tmdb%3A42%3As2%3Ae3/subtitles"
     ]);
+  });
+
+  it("maps AniList ids and embedded absolute episodes into API requests", async () => {
+    const plugin = loadPlugin((call) =>
+      payloadFor(call, {
+        sources: [
+          {
+            label: "Sub",
+            type: "hls",
+            delivery: "stream",
+            url: "https://cdn.example/anilist.m3u8"
+          }
+        ]
+      })
+    );
+
+    const explicit = await plugin.getStreams("anilist:16498:1", "tv", null, 1);
+    expect(explicit).toHaveLength(1);
+    expect(explicit[0]?.title).toBe("Test Anime - E01");
+    expect(plugin.calls.map((call) => call.url)).toEqual([
+      "https://api.test/api/anime/anilist:16498",
+      "https://api.test/api/episode/anilist%3A16498%3Ae1/sources",
+      "https://api.test/api/episode/anilist%3A16498%3Ae1/subtitles"
+    ]);
+
+    plugin.calls.length = 0;
+    const embedded = await plugin.getStreams("anilist:16498:26", "tv", null, null);
+    expect(embedded).toHaveLength(1);
+    expect(embedded[0]?.title).toBe("Test Anime - E26");
+    expect(plugin.calls.map((call) => call.url)).toEqual([
+      "https://api.test/api/anime/anilist:16498",
+      "https://api.test/api/episode/anilist%3A16498%3Ae26/sources",
+      "https://api.test/api/episode/anilist%3A16498%3Ae26/subtitles"
+    ]);
+  });
+
+  it("does not turn a null season into season 0", async () => {
+    const plugin = loadPlugin((call) => payloadFor(call, {}));
+
+    await plugin.getStreams(1429, "tv", null, 26);
+
+    expect(plugin.calls.map((call) => call.url)).toEqual([
+      "https://api.test/api/anime/tmdb:1429",
+      "https://api.test/api/episode/tmdb%3A1429%3Ae26/sources",
+      "https://api.test/api/episode/tmdb%3A1429%3Ae26/subtitles"
+    ]);
+    expect(plugin.calls.some((call) => call.url.includes("%3As0%3A"))).toBe(false);
+  });
+
+  it("declares anime alongside movie and tv in the manifest", () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL("../nuvio-plugin/manifest.json", import.meta.url), "utf8")
+    ) as { scrapers: Array<{ supportedTypes: string[] }> };
+
+    expect(manifest.scrapers[0]?.supportedTypes).toEqual(
+      expect.arrayContaining(["movie", "tv", "anime"])
+    );
   });
 
   it("drops expired, non-stream, duplicate and malformed sources", async () => {

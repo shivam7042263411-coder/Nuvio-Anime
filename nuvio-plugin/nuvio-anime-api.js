@@ -20,7 +20,7 @@
 
 var DEFAULT_API_BASE = "https://nuvio-anime-api.antideploy.app";
 var PLUGIN_NAME = "Anime API";
-var PLUGIN_VERSION = "1.0.0";
+var PLUGIN_VERSION = "1.0.1";
 
 function configuredApiBase() {
     var value = "";
@@ -90,22 +90,57 @@ function normalizeHeaders(headers) {
     return count > 0 ? out : null;
 }
 
-function buildEpisodeId(tmdbId, mediaType, season, episode) {
-    var id = Number(tmdbId);
-    if (!isFinite(id) || id <= 0) return null;
+function optionalNumber(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "string" && value.trim() === "") return null;
+    var number = Number(value);
+    return isFinite(number) ? Math.floor(number) : null;
+}
 
-    if (isMovie(mediaType)) {
-        return "tmdb:" + Math.floor(id) + ":e1";
+function parseMediaRef(raw) {
+    var text = String(raw == null ? "" : raw).trim();
+    var match = /^(anilist|tmdb):(\d+)(?::(\d+))?$/i.exec(text);
+
+    if (match) {
+        return {
+            prefix: match[1].toLowerCase(),
+            id: match[2],
+            embeddedEpisode: optionalNumber(match[3])
+        };
     }
 
-    var seasonNumber = Math.floor(finiteNumber(season, 1));
-    var episodeNumber = Math.floor(finiteNumber(episode, 1));
-    if (seasonNumber < 0) seasonNumber = 1;
-    if (episodeNumber < 0) episodeNumber = 1;
+    var numeric = Number(text);
+    if (isFinite(numeric) && numeric > 0) {
+        return {
+            prefix: "tmdb",
+            id: String(Math.floor(numeric)),
+            embeddedEpisode: null
+        };
+    }
+
+    return null;
+}
+
+function buildEpisodeId(ref, mediaType, season, episode) {
+    if (isMovie(mediaType)) {
+        return ref.prefix + ":" + ref.id + ":e1";
+    }
+
+    var episodeNumber = optionalNumber(episode);
+    if (episodeNumber === null) episodeNumber = ref.embeddedEpisode;
+    if (episodeNumber === null || episodeNumber < 0) episodeNumber = 1;
+
+    var seasonNumber = optionalNumber(season);
+    if (seasonNumber !== null && seasonNumber < 0) seasonNumber = null;
+
+    if (seasonNumber === null) {
+        return ref.prefix + ":" + ref.id + ":e" + episodeNumber;
+    }
 
     return (
-        "tmdb:" +
-        Math.floor(id) +
+        ref.prefix +
+        ":" +
+        ref.id +
         ":s" +
         seasonNumber +
         ":e" +
@@ -172,9 +207,11 @@ function buildTitle(anime, mediaType, season, episodeNumber) {
         return preferred || "Movie";
     }
 
-    var seasonLabel = "S" + pad2(season);
     var episodeLabel = "E" + pad2(episodeNumber);
-    var suffix = " - " + seasonLabel + episodeLabel;
+    var suffix =
+        season === null || season === undefined
+            ? " - " + episodeLabel
+            : " - S" + pad2(season) + episodeLabel;
 
     return preferred ? preferred + suffix : "Episode " + episodeNumber;
 }
@@ -276,10 +313,17 @@ function sortStreams(a, b) {
 
 async function getStreams(tmdbId, mediaType, season, episode) {
     var results = [];
-    var episodeId = buildEpisodeId(tmdbId, mediaType, season, episode);
+    var ref = parseMediaRef(tmdbId);
+
+    if (!ref) {
+        logError("Unsupported media id: " + tmdbId);
+        return results;
+    }
+
+    var episodeId = buildEpisodeId(ref, mediaType, season, episode);
 
     if (!episodeId) {
-        logError("Invalid TMDB id: " + tmdbId);
+        logError("Invalid episode reference for: " + tmdbId);
         return results;
     }
 
@@ -294,7 +338,7 @@ async function getStreams(tmdbId, mediaType, season, episode) {
         return results;
     }
 
-    var animePath = "/api/anime/tmdb:" + Math.floor(Number(tmdbId));
+    var animePath = "/api/anime/" + ref.prefix + ":" + ref.id;
     var encodedEpisode = encodeURIComponent(episodeId);
 
     logInfo(
@@ -315,8 +359,10 @@ async function getStreams(tmdbId, mediaType, season, episode) {
     var sourceData = responses[1];
     var subtitleData = responses[2];
 
-    var seasonNumber = Math.floor(finiteNumber(season, 1));
-    var episodeNumber = Math.floor(finiteNumber(episode, 1));
+    var seasonNumber = optionalNumber(season);
+    var episodeNumber = optionalNumber(episode);
+    if (episodeNumber === null) episodeNumber = ref.embeddedEpisode;
+    if (episodeNumber === null) episodeNumber = 1;
     var title = buildTitle(anime, mediaType, seasonNumber, episodeNumber);
     var subtitles = mapSubtitles(subtitleData);
 
