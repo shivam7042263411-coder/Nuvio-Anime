@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.antideploy.json
+.npmrc
+*.pem
+*.key
+.secrets/
+secrets.json
+
+# Local databases, caches and logs
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+.cache/
+coverage/
+*.log
+npm-debug.log*
+
+# Editor and OS files
+.DS_Store
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
